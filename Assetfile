@@ -23,6 +23,17 @@ class EmberLicenseFilter < Rake::Pipeline::Filter
   end
 end
 
+class EmberNodeFilter < Rake::Pipeline::Filter
+  def generate_output(inputs, output)
+    inputs.each do |input|
+      result = File.read(input.fullpath)
+      result.gsub!("(function(exports) {", "(function(exports, window) {")
+      result.gsub!("})({});", "})({}, global);")
+      output.write result
+    end
+  end
+end
+
 class JSHintRC < Rake::Pipeline::Filter
   def generate_output(inputs, output)
     inputs.each do |input|
@@ -35,6 +46,7 @@ end
 
 distros = {
   :runtime => %w(ember-metal ember-runtime),
+  :node    => %w(ember-metal ember-runtime ember-states),
   :full    => %w(handlebars ember-metal ember-runtime ember-views ember-states metamorph ember-handlebars)
 }
 
@@ -88,7 +100,11 @@ distros.each do |name, modules|
   input "dist/modules" do
     module_paths = modules.map{|m| "#{m}.js" }
     match "{#{module_paths.join(',')}}" do
-      concat(module_paths){ ["#{name}.js", "#{name}.prod.js"] }
+      if name == 'ember-node'
+        filter(EmberNodeFilter){  ["#{name}.js", "#{name}.prod.js"] }
+      else
+        concat(module_paths){ ["#{name}.js", "#{name}.prod.js"] }
+      end
     end
 
     # Add debug to the main distro
